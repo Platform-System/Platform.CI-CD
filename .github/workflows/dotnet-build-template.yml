@@ -1,4 +1,4 @@
-﻿name: .NET Core Build Template
+name: .NET Core Build Template
 
 on:
   workflow_call:
@@ -7,6 +7,11 @@ on:
         required: true
         type: string
         description: 'Path to the .csproj or .sln file to build'
+      dependencies:
+        required: false
+        type: string
+        default: ""
+        description: 'Comma-separated list of additional repositories to checkout (e.g., "Org/Repo1,Org/Repo2")'
       dotnet_version:
         required: false
         type: string
@@ -17,7 +22,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Triggering Repo
+        uses: actions/checkout@v4
+        with:
+          path: main_repo
+
+      - name: Checkout Dependencies
+        if: ${{ inputs.dependencies != '' }}
+        run: |
+          IFS=',' read -ra ADDR <<< "${{ inputs.dependencies }}"
+          for repo in "${ADDR[@]}"; do
+            repo_name=$(echo $repo | cut -d'/' -f2)
+            echo "Cloning $repo into $repo_name..."
+            git clone https://github.com/$repo.git ../$repo_name
+          done
+        working-directory: main_repo
       
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -26,6 +45,8 @@ jobs:
           
       - name: Restore dependencies
         run: dotnet restore ${{ inputs.project_path }}
+        working-directory: main_repo
         
       - name: Build
         run: dotnet build ${{ inputs.project_path }} --no-restore
+        working-directory: main_repo
