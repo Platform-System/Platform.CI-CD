@@ -1,0 +1,31 @@
+﻿name: .NET Core Build Template
+
+on:
+  workflow_call:
+    inputs:
+      project_path:
+        required: true
+        type: string
+        description: 'Path to the .csproj or .sln file to build'
+      dotnet_version:
+        required: false
+        type: string
+        default: '8.0.x'
+        description: 'Version of .NET to use'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+          
+      - name: Restore dependencies
+        run: dotnet restore ${{ inputs.project_path }}
+        
+      - name: Build
+        run: dotnet build ${{ inputs.project_path }} --no-restore
