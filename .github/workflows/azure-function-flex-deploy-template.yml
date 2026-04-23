@@ -21,10 +21,18 @@ on:
         type: string
         default: 'linux-x64'
         description: 'Runtime identifier used by dotnet publish'
+      dependencies:
+        required: false
+        type: string
+        default: ""
+        description: 'Comma-separated list of additional repositories to checkout (e.g., "Org/Repo1,Org/Repo2")'
     secrets:
       publish_profile:
         required: true
         description: 'Azure Function App publish profile'
+      repo_access_token:
+        required: false
+        description: 'Token with read access to private dependency repositories'
 
 jobs:
   deploy:
@@ -35,6 +43,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: main_repo
+
+      - name: Checkout Dependencies
+        if: ${{ inputs.dependencies != '' }}
+        env:
+          REPO_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
+          GITHUB_TOKEN_FALLBACK: ${{ github.token }}
+        run: |
+          token="${REPO_ACCESS_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+
+          if [ -z "$token" ]; then
+            echo "Missing token for dependency checkout."
+            echo "Provide workflow secret 'repo_access_token' or use 'secrets: inherit' with an org/repo secret."
+            exit 1
+          fi
+
+          IFS=',' read -ra ADDR <<< "${{ inputs.dependencies }}"
+          for repo in "${ADDR[@]}"; do
+            repo_name=$(echo $repo | cut -d'/' -f2)
+            echo "Cloning $repo into $repo_name..."
+            git clone https://x-access-token:$token@github.com/$repo.git ../$repo_name
+          done
+        working-directory: main_repo
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
