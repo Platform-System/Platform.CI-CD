@@ -1,0 +1,54 @@
+name: Azure Function Flex Deploy Template
+
+on:
+  workflow_call:
+    inputs:
+      project_path:
+        required: true
+        type: string
+        description: 'Path to the Azure Function .csproj file'
+      function_app_name:
+        required: true
+        type: string
+        description: 'Azure Function App name'
+      dotnet_version:
+        required: false
+        type: string
+        default: '8.0.x'
+        description: 'Version of .NET to use'
+      runtime_identifier:
+        required: false
+        type: string
+        default: 'linux-x64'
+        description: 'Runtime identifier used by dotnet publish'
+    secrets:
+      publish_profile:
+        required: true
+        description: 'Azure Function App publish profile'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Triggering Repo
+        uses: actions/checkout@v4
+        with:
+          path: main_repo
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+
+      - name: Publish
+        run: dotnet publish ${{ inputs.project_path }} --configuration Release --runtime ${{ inputs.runtime_identifier }} --self-contained false --output publish
+        working-directory: main_repo
+
+      - name: Deploy to Azure Function App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ inputs.function_app_name }}
+          package: main_repo/publish
+          sku: flexconsumption
+          publish-profile: ${{ secrets.publish_profile }}
